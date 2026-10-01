@@ -66,7 +66,18 @@ button:focus-visible, input:focus-visible, .search:focus-within, .upload:focus-w
 .banner code { font-family: var(--mono); font-size: 12px; }
 
 /* Current meal */
-.now { padding: 22px 16px 4px; }
+.now { padding: 18px 16px 4px; }
+.now-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Language switch */
+.lang { display: flex; flex-shrink: 0; border: 1px solid var(--ink); }
+.lang-btn {
+  position: relative; height: 30px; min-width: 38px; padding: 0 8px; border: 0; background: var(--white);
+  font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.06em;
+}
+.lang-btn + .lang-btn { border-left: 1px solid var(--ink); }
+.lang-btn[aria-pressed="true"] { background: var(--ink); color: var(--yellow); }
+.lang-btn::after { content: ''; position: absolute; inset: -7px 0; } /* 44px tall tap target */
 .eyebrow {
   font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted);

@@ -16,8 +16,188 @@ const QR_BUCKET = 'qr';
 const JSQR_SRC = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const DAY_FULL = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday' };
-const MEALS = [['L', 'Lunch'], ['D', 'Dinner']];
+const MEALS = ['L', 'D'];
+const LANG_KEY = 'boxpasti-lang';
+
+/* ----------------------------------------------------------- Language --- */
+
+function cap(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Every piece of visible text, in Italian (the default) and English.
+const STRINGS = {
+  it: {
+    locale: 'it-IT',
+    days: { Mon: 'lunedì', Tue: 'martedì', Wed: 'mercoledì', Thu: 'giovedì', Fri: 'venerdì' },
+    daysShort: { Mon: 'Lun', Tue: 'Mar', Wed: 'Mer', Thu: 'Gio', Fri: 'Ven' },
+    meals: { L: 'pranzo', D: 'cena' },
+    title: (day, meal) => cap(meal) + ' di ' + day,
+    every: (day, meal) => 'Ogni ' + day + ' a ' + meal,
+    summaryPart: (meal, days) => cap(meal) + ' ' + days,
+    weeklySum: (sum) => 'Ogni settimana: ' + sum,
+    htmlDesc: 'Chi ha bisogno del box per il pasto di adesso.',
+    langLabel: 'Lingua',
+    clears: 'Fino alle',
+    now: 'In corso',
+    search: 'Cerca il tuo nome',
+    tabBox: 'Box da fare',
+    tabNot: 'Senza box',
+    hintBox: 'Cucina: scansiona ogni QR e prepara il box. Tocca un QR per ingrandirlo.',
+    hintNot: 'Ritiri tu il pasto. Non ce la fai? Tocca Fammi il box.',
+    foot: 'Si azzera dopo pranzo (15:00) e cena (21:30).',
+    addQr: 'Aggiungi il tuo QR',
+    close: 'Chiudi',
+    doneOf: (done, total) => done + ' di ' + total + ' pronti',
+    markAll: 'Segna tutti pronti',
+    allDone: 'Tutti pronti',
+    allToast: 'Tutti segnati come pronti',
+    mark: 'Segna pronto',
+    marked: 'Pronto',
+    markAria: (name) => name + ': segna come pronto',
+    markedAria: (name) => name + ': pronto. Tocca per annullare',
+    unbox: 'Niente box',
+    boxMe: 'Fammi il box',
+    onlyThis: 'Solo per questo pasto',
+    skip: 'Niente box questa volta',
+    noSched: 'Nessun programma settimanale',
+    paused: 'Programma settimanale in pausa',
+    noQrYet: 'Nessun QR',
+    addIt: 'Aggiungilo',
+    enlarge: (name) => 'Ingrandisci il QR di ' + name,
+    addQrFor: (name) => 'Aggiungi un QR per ' + name,
+    edit: (name) => 'Modifica ' + name,
+    qrOf: (name) => 'QR di ' + name,
+    movedIn: (name) => name + ': box per questo pasto',
+    movedOut: (name) => name + ': niente box per questo pasto',
+    loading: 'Caricamento…',
+    noMatchBox: 'Nessun risultato tra i box da fare.',
+    emptyBox: 'Nessuno ha bisogno del box per questo pasto.',
+    noMatch: 'Nessun risultato.',
+    emptyNot: 'Sono tutti nella lista dei box.',
+    loadErr: 'Impossibile caricare la lista. Controlla la connessione.',
+    saveErrShort: 'Impossibile salvare. Riprova.',
+    addTitle: 'Aggiungiti',
+    editTitle: 'Modifica i tuoi dati',
+    yourName: 'Il tuo nome',
+    namePh: 'Cognome Nome',
+    yourQr: 'Il tuo QR',
+    yourQrAlt: 'Il QR che hai caricato',
+    upload: 'Carica QR',
+    replace: 'Sostituisci QR',
+    qrHelp: 'Uno screenshot del QR dall’app dei pasti.',
+    reading: 'Lettura dell’immagine…',
+    found: 'QR trovato e ritagliato.',
+    notFound: 'Non trovo un QR nell’immagine. Se puoi, ritaglia lo screenshot sul solo codice.',
+    badImage: 'Impossibile leggere l’immagine. Prova con uno screenshot PNG o JPG.',
+    weekly: 'Box ogni settimana',
+    weeklyHelp: 'Scegli i pasti che salti sempre. Puoi disattivarlo quando vuoi.',
+    save: 'Salva',
+    saving: 'Salvataggio…',
+    cancel: 'Annulla',
+    removeMe: 'Toglimi dalla lista',
+    needName: 'Inserisci prima il tuo nome.',
+    needQr: 'Carica il tuo QR così la cucina può scansionarlo.',
+    saveErr: 'Impossibile salvare. Controlla la connessione e riprova.',
+    removeErr: 'Impossibile eliminare. Controlla la connessione e riprova.',
+    confirmRemove: (name) => 'Togliere ' + name + ' dalla lista?',
+    thisEntry: 'questa persona',
+    saved: 'Salvato',
+    added: 'Sei nella lista',
+    removed: 'Eliminato',
+    offline: 'Impossibile raggiungere il server. Controlla la connessione e ricarica la pagina.',
+    demo: '<strong>Modalità demo.</strong> Le modifiche restano solo in questo browser. Inserisci URL e chiave di Supabase in <code>app.js</code> per condividere la lista.'
+  },
+  en: {
+    locale: 'en-GB',
+    days: { Mon: 'monday', Tue: 'tuesday', Wed: 'wednesday', Thu: 'thursday', Fri: 'friday' },
+    daysShort: { Mon: 'Mon', Tue: 'Tue', Wed: 'Wed', Thu: 'Thu', Fri: 'Fri' },
+    meals: { L: 'lunch', D: 'dinner' },
+    title: (day, meal) => cap(day) + ' ' + meal,
+    every: (day, meal) => 'Every ' + cap(day) + ' ' + meal,
+    summaryPart: (meal, days) => cap(meal) + ' ' + days,
+    weeklySum: (sum) => 'Weekly: ' + sum,
+    htmlDesc: 'Who needs their meal boxed at this service.',
+    langLabel: 'Language',
+    clears: 'Clears',
+    now: 'Now collecting',
+    search: 'Find your name',
+    tabBox: 'To box',
+    tabNot: 'Not boxed',
+    hintBox: 'Kitchen: scan each QR and box the meal. Tap a QR to enlarge it.',
+    hintNot: 'Picking up yourself. Can’t make it? Tap Box me.',
+    foot: 'Resets after lunch (15:00) and dinner (21:30).',
+    addQr: 'Add your QR',
+    close: 'Close',
+    doneOf: (done, total) => done + ' of ' + total + ' boxed',
+    markAll: 'Mark all boxed',
+    allDone: 'All boxed',
+    allToast: 'All marked as boxed',
+    mark: 'Mark boxed',
+    marked: 'Boxed',
+    markAria: (name) => name + ': mark as boxed',
+    markedAria: (name) => name + ': boxed. Tap to undo',
+    unbox: 'Unbox',
+    boxMe: 'Box me',
+    onlyThis: 'Added for this meal',
+    skip: 'Skipping the box this time',
+    noSched: 'No weekly schedule',
+    paused: 'Weekly schedule paused',
+    noQrYet: 'No QR yet',
+    addIt: 'Add it',
+    enlarge: (name) => 'Enlarge QR for ' + name,
+    addQrFor: (name) => 'Add a QR for ' + name,
+    edit: (name) => 'Edit ' + name,
+    qrOf: (name) => 'QR code for ' + name,
+    movedIn: (name) => name + ' moved to To box',
+    movedOut: (name) => name + ' moved to Not boxed',
+    loading: 'Loading…',
+    noMatchBox: 'No match on the box list.',
+    emptyBox: 'Nobody needs a box for this meal yet.',
+    noMatch: 'No match.',
+    emptyNot: 'Everyone is on the box list.',
+    loadErr: 'Couldn’t load the list. Check your connection.',
+    saveErrShort: 'Couldn’t save that. Try again.',
+    addTitle: 'Add yourself',
+    editTitle: 'Edit your entry',
+    yourName: 'Your name',
+    namePh: 'Surname Name',
+    yourQr: 'Your QR',
+    yourQrAlt: 'Your uploaded QR',
+    upload: 'Upload QR',
+    replace: 'Replace QR',
+    qrHelp: 'A screenshot of the QR from the meal app.',
+    reading: 'Reading the image…',
+    found: 'Found your QR and cropped it.',
+    notFound: 'Couldn’t spot a QR in that image. Crop the screenshot to just the code if you can.',
+    badImage: 'That image couldn’t be read. Try a PNG or JPG screenshot.',
+    weekly: 'Box me every week',
+    weeklyHelp: 'Pick the meals you always miss. Turn off any time.',
+    save: 'Save',
+    saving: 'Saving…',
+    cancel: 'Cancel',
+    removeMe: 'Remove me from the list',
+    needName: 'Add your name first.',
+    needQr: 'Upload your QR so the kitchen can scan it.',
+    saveErr: 'Couldn’t save. Check your connection and try again.',
+    removeErr: 'Couldn’t remove. Check your connection and try again.',
+    confirmRemove: (name) => 'Remove ' + name + ' from the list?',
+    thisEntry: 'this entry',
+    saved: 'Saved',
+    added: 'You’re on the list',
+    removed: 'Removed',
+    offline: 'Couldn’t reach the server. Check your connection and reload.',
+    demo: '<strong>Demo mode.</strong> Changes are saved only in this browser. Add the Supabase URL and key in <code>app.js</code> to share the list.'
+  }
+};
+
+let lang = 'it';
+try { if (localStorage.getItem(LANG_KEY) === 'en') lang = 'en'; } catch (e) { /* storage blocked: stay on Italian */ }
+
+function t(key, ...args) {
+  const v = STRINGS[lang][key];
+  return typeof v === 'function' ? v(...args) : v;
+}
 
 // Made-up people, only used to fill demo mode.
 // The live database is seeded by supabase/seed.local.sql (kept out of git).
@@ -91,14 +271,11 @@ function currentService() {
     date.setUTCDate(date.getUTCDate() + 1);
     meal = 'L';
   }
-  const day = DAYS[date.getUTCDay() - 1];
   return {
     key: ymd(date) + '-' + meal,
-    day: day,
+    date: date,
+    day: DAYS[date.getUTCDay() - 1],
     meal: meal,
-    dayFull: DAY_FULL[day],
-    mealLabel: meal === 'L' ? 'lunch' : 'dinner',
-    dateLabel: date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }),
     reset: meal === 'L' ? '15:00' : '21:30'
   };
 }
@@ -142,9 +319,9 @@ function hasAny(s) {
 
 function summary(s) {
   const parts = [];
-  MEALS.forEach(([m, label]) => {
-    const days = DAYS.filter((d) => s[d][m]);
-    if (days.length) parts.push(label + ' ' + days.join(', '));
+  MEALS.forEach((m) => {
+    const days = DAYS.filter((d) => s[d][m]).map((d) => t('daysShort')[d]);
+    if (days.length) parts.push(t('summaryPart', t('meals')[m], days.join(', ')));
   });
   return parts.join(' · ');
 }
@@ -341,7 +518,7 @@ async function refresh() {
     state.loaded = true;
   } catch (e) {
     console.error(e);
-    if (seq === loadSeq) toast('Couldn’t load the list. Check your connection.');
+    if (seq === loadSeq) toast(t('loadErr'));
   }
   render();
 }
@@ -374,7 +551,7 @@ async function setBoxed(p, want) {
   if (want === natural) delete state.overrides[p.id];
   else state.overrides[p.id] = want ? 'box' : 'unbox';
   render();
-  toast(want ? p.name + ' moved to To box' : p.name + ' moved to Not boxed');
+  toast(t(want ? 'movedIn' : 'movedOut', p.name));
   try {
     if (want === natural) await store.clearOverride(key, p.id);
     else await store.setOverride(key, p.id, state.overrides[p.id]);
@@ -384,7 +561,7 @@ async function setBoxed(p, want) {
     if (prev) state.overrides[p.id] = prev; else delete state.overrides[p.id];
     if (wasMarked) state.boxed.add(p.id);
     render();
-    toast('Couldn’t save that. Try again.');
+    toast(t('saveErrShort'));
   }
 }
 
@@ -403,7 +580,7 @@ async function setMarked(ids, on) {
       ids.forEach((id) => { if (on) state.boxed.delete(id); else state.boxed.add(id); });
       render();
     }
-    toast('Couldn’t save that. Try again.');
+    toast(t('saveErrShort'));
   }
 }
 
@@ -413,18 +590,18 @@ let lastBoxHtml = null;
 let lastNotHtml = null;
 
 function markBtnHtml(p, done) {
-  const label = esc(p.name) + (done ? ': boxed. Tap to undo' : ': mark as boxed');
-  return `<button class="btn-mark" data-action="mark" data-id="${esc(p.id)}" aria-pressed="${done}" aria-label="${label}">${done ? DONE_ICON + 'Boxed' : 'Mark boxed'}</button>`;
+  const label = esc(t(done ? 'markedAria' : 'markAria', p.name));
+  return `<button class="btn-mark" data-action="mark" data-id="${esc(p.id)}" aria-pressed="${done}" aria-label="${label}">${done ? DONE_ICON + esc(t('marked')) : esc(t('mark'))}</button>`;
 }
 
 function cardHtml({ p, ov }) {
   const svc = state.svc;
   const done = state.boxed.has(p.id);
-  const reason = ov === 'box' ? 'Added for this meal' : 'Every ' + svc.dayFull + ' ' + svc.mealLabel;
-  const stamp = done ? `<span class="stamp" aria-hidden="true">${DONE_ICON}Boxed</span>` : '';
+  const reason = ov === 'box' ? t('onlyThis') : t('every', t('days')[svc.day], t('meals')[svc.meal]);
+  const stamp = done ? `<span class="stamp" aria-hidden="true">${DONE_ICON}${esc(t('marked'))}</span>` : '';
   const qr = p.qrUrl
-    ? `<button class="card-qr" data-action="qr" data-id="${esc(p.id)}" aria-label="Enlarge QR for ${esc(p.name)}"><img src="${esc(p.qrUrl)}" alt="" loading="lazy" decoding="async">${stamp}</button>`
-    : `<button class="card-qr" data-action="edit" data-id="${esc(p.id)}" aria-label="Add a QR for ${esc(p.name)}"><span class="no-qr">No QR yet<strong>Add it</strong></span>${stamp}</button>`;
+    ? `<button class="card-qr" data-action="qr" data-id="${esc(p.id)}" aria-label="${esc(t('enlarge', p.name))}"><img src="${esc(p.qrUrl)}" alt="" loading="lazy" decoding="async">${stamp}</button>`
+    : `<button class="card-qr" data-action="edit" data-id="${esc(p.id)}" aria-label="${esc(t('addQrFor', p.name))}"><span class="no-qr">${esc(t('noQrYet'))}<strong>${esc(t('addIt'))}</strong></span>${stamp}</button>`;
   return `<div class="card${done ? ' is-done' : ''}">${qr}
     <div class="card-body">
       <div class="card-name">${esc(p.name)}</div>
@@ -432,8 +609,8 @@ function cardHtml({ p, ov }) {
       <div class="card-actions">
         ${markBtnHtml(p, done)}
         <div class="card-row">
-          <button class="btn-unbox" data-action="unbox" data-id="${esc(p.id)}">Unbox</button>
-          <button class="btn-icon" data-action="edit" data-id="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${PEN_ICON}</button>
+          <button class="btn-unbox" data-action="unbox" data-id="${esc(p.id)}">${esc(t('unbox'))}</button>
+          <button class="btn-icon" data-action="edit" data-id="${esc(p.id)}" aria-label="${esc(t('edit', p.name))}">${PEN_ICON}</button>
         </div>
       </div>
     </div>
@@ -442,25 +619,25 @@ function cardHtml({ p, ov }) {
 
 function rowHtml({ p, ov }) {
   let reason;
-  if (ov === 'unbox') reason = 'Skipping the box this time';
-  else if (!hasAny(p.sched)) reason = 'No weekly schedule';
-  else if (!p.recurring) reason = 'Weekly schedule paused';
-  else reason = 'Weekly: ' + summary(p.sched);
+  if (ov === 'unbox') reason = t('skip');
+  else if (!hasAny(p.sched)) reason = t('noSched');
+  else if (!p.recurring) reason = t('paused');
+  else reason = t('weeklySum', summary(p.sched));
   return `<div class="row">
     <div class="row-main">
       <div class="row-name">${esc(p.name)}</div>
       <div class="reason">${esc(reason)}</div>
     </div>
-    <button class="btn-icon" data-action="edit" data-id="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${PEN_ICON}</button>
-    <button class="btn-boxme" data-action="box" data-id="${esc(p.id)}">Box me</button>
+    <button class="btn-icon" data-action="edit" data-id="${esc(p.id)}" aria-label="${esc(t('edit', p.name))}">${PEN_ICON}</button>
+    <button class="btn-boxme" data-action="box" data-id="${esc(p.id)}">${esc(t('boxMe'))}</button>
   </div>`;
 }
 
 function render() {
   const svc = state.svc;
   $('resetTime').textContent = svc.reset;
-  $('dateLabel').textContent = svc.dateLabel;
-  $('mealTitle').textContent = svc.dayFull + ' ' + svc.mealLabel;
+  $('dateLabel').textContent = svc.date.toLocaleDateString(t('locale'), { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  $('mealTitle').textContent = t('title', t('days')[svc.day], t('meals')[svc.meal]);
 
   const q = fold(state.query.trim());
   const boxed = [];
@@ -479,10 +656,10 @@ function render() {
   const doneCount = toBoxIds.filter((id) => state.boxed.has(id)).length;
   const allDone = doneCount === toBoxIds.length;
   $('kitchenBar').hidden = !toBoxIds.length;
-  $('doneCount').textContent = doneCount + ' of ' + toBoxIds.length;
+  $('doneCount').textContent = t('doneOf', doneCount, toBoxIds.length);
   $('doneFill').style.width = (toBoxIds.length ? 100 * doneCount / toBoxIds.length : 0) + '%';
   $('allBtn').disabled = allDone;
-  $('allBtn').innerHTML = DONE_ICON + (allDone ? 'All boxed' : 'Mark all boxed');
+  $('allBtn').innerHTML = DONE_ICON + esc(t(allDone ? 'allDone' : 'markAll'));
 
   const onBox = state.tab === 'box';
   $('tabBox').classList.toggle('is-active', onBox);
@@ -498,14 +675,12 @@ function render() {
   if (boxHtml !== lastBoxHtml) { $('boxGrid').innerHTML = boxHtml; lastBoxHtml = boxHtml; }
   $('boxGrid').hidden = !boxed.length;
   $('boxEmpty').hidden = boxed.length > 0;
-  $('boxEmpty').textContent = !state.loaded ? 'Loading…'
-    : q ? 'No match on the box list.' : 'Nobody needs a box for this meal yet.';
+  $('boxEmpty').textContent = !state.loaded ? t('loading') : t(q ? 'noMatchBox' : 'emptyBox');
 
   const notHtml = notBoxed.map(rowHtml).join('');
   if (notHtml !== lastNotHtml) { $('notList').innerHTML = notHtml; lastNotHtml = notHtml; }
   $('notEmpty').hidden = notBoxed.length > 0;
-  $('notEmpty').textContent = !state.loaded ? 'Loading…'
-    : q ? 'No match.' : 'Everyone is on the box list.';
+  $('notEmpty').textContent = !state.loaded ? t('loading') : t(q ? 'noMatch' : 'emptyNot');
 
   if (!$('qrSheet').hidden) {
     const p = state.people.find((x) => x.id === qrPersonId);
@@ -542,7 +717,7 @@ function closeSheet(el) {
 }
 
 function openQr(p, opener) {
-  $('qrImgWrap').innerHTML = `<img src="${esc(p.qrUrl)}" alt="QR code for ${esc(p.name)}">`;
+  $('qrImgWrap').innerHTML = `<img src="${esc(p.qrUrl)}" alt="${esc(t('qrOf', p.name))}">`;
   $('qrName').textContent = p.name;
   qrPersonId = p.id;
   openSheet($('qrSheet'), opener);
@@ -566,7 +741,7 @@ function openForm(p, opener) {
     ? { id: p.id, name: p.name, qrUrl: p.qrUrl, blob: null, preview: null, recurring: p.recurring, sched: normSched(p.sched) }
     : { id: null, name: '', qrUrl: null, blob: null, preview: null, recurring: false, sched: emptySched() };
   $('fName').value = draft.name;
-  setNote('A screenshot of the QR from the meal app.', false);
+  setNote(t('qrHelp'), false);
   showErr('');
   updateForm();
   openSheet($('formSheet'), opener);
@@ -575,11 +750,12 @@ function openForm(p, opener) {
 }
 
 function buildSchedGrid() {
-  let html = '<span></span>' + DAYS.map((d) => `<span class="sched-day">${d}</span>`).join('');
-  MEALS.forEach(([m, label]) => {
-    html += `<span class="sched-label">${label}</span>`;
+  let html = '<span></span>' + DAYS.map((d) => `<span class="sched-day">${esc(t('daysShort')[d])}</span>`).join('');
+  MEALS.forEach((m) => {
+    const meal = t('meals')[m];
+    html += `<span class="sched-label">${esc(cap(meal))}</span>`;
     DAYS.forEach((d) => {
-      html += `<button type="button" class="chip" data-day="${d}" data-meal="${m}" aria-pressed="false" aria-label="${DAY_FULL[d]} ${label.toLowerCase()}">${CHECK_ICON}</button>`;
+      html += `<button type="button" class="chip" data-day="${d}" data-meal="${m}" aria-pressed="false" aria-label="${esc(cap(t('days')[d]) + ' ' + meal)}">${CHECK_ICON}</button>`;
     });
   });
   $('fGrid').innerHTML = html;
@@ -587,12 +763,12 @@ function buildSchedGrid() {
 
 function updateForm() {
   const d = draft;
-  $('formTitle').textContent = d.id ? 'Edit your entry' : 'Add yourself';
+  $('formTitle').textContent = t(d.id ? 'editTitle' : 'addTitle');
   const src = d.preview || d.qrUrl;
   const prev = $('fQrPreview');
   prev.classList.toggle('is-empty', !src);
-  prev.innerHTML = src ? `<img src="${esc(src)}" alt="Your uploaded QR">` : 'No QR yet';
-  $('uploadLabel').textContent = src ? 'Replace QR' : 'Upload QR';
+  prev.innerHTML = src ? `<img src="${esc(src)}" alt="${esc(t('yourQrAlt'))}">` : esc(t('noQrYet'));
+  $('uploadLabel').textContent = t(src ? 'replace' : 'upload');
   $('fRec').setAttribute('aria-checked', String(d.recurring));
   $('fGrid').classList.toggle('is-off', !d.recurring);
   $('fGrid').querySelectorAll('.chip').forEach((b) => {
@@ -619,7 +795,7 @@ async function onFile(e) {
   const forDraft = draft;
   const upload = $('fFile').closest('.upload');
   upload.classList.add('is-busy');
-  setNote('Reading the image…', false);
+  setNote(t('reading'), false);
   try {
     const out = await prepareQr(file);
     if (draft !== forDraft) return;
@@ -627,13 +803,13 @@ async function onFile(e) {
     draft.blob = out.blob;
     draft.preview = URL.createObjectURL(out.blob);
     showErr('');
-    if (out.found) setNote('Found your QR and cropped it.', false);
-    else setNote('Couldn’t spot a QR in that image. Crop the screenshot to just the code if you can.', true);
+    if (out.found) setNote(t('found'), false);
+    else setNote(t('notFound'), true);
     updateForm();
   } catch (err) {
     console.error(err);
-    setNote('A screenshot of the QR from the meal app.', false);
-    showErr('That image couldn’t be read. Try a PNG or JPG screenshot.');
+    setNote(t('qrHelp'), false);
+    showErr(t('badImage'));
   } finally {
     upload.classList.remove('is-busy');
   }
@@ -644,12 +820,12 @@ async function onSave(e) {
   if (!draft || saving) return;
   const d = draft;
   const name = $('fName').value.trim().replace(/\s+/g, ' ');
-  if (!name) { showErr('Add your name first.'); $('fName').focus(); return; }
-  if (!d.id && !d.blob) { showErr('Upload your QR so the kitchen can scan it.'); return; }
+  if (!name) { showErr(t('needName')); $('fName').focus(); return; }
+  if (!d.id && !d.blob) { showErr(t('needQr')); return; }
 
   saving = true;
   $('fSave').disabled = true;
-  $('fSave').textContent = 'Saving…';
+  $('fSave').textContent = t('saving');
   try {
     let qrUrl = d.qrUrl;
     if (d.blob) qrUrl = await store.uploadQr(d.blob);
@@ -658,15 +834,15 @@ async function onSave(e) {
     else await store.addPerson(row);
     if (d.blob && d.qrUrl) store.deleteQr(d.qrUrl).catch(console.error);
     closeSheet($('formSheet'));
-    toast(d.id ? 'Saved' : 'You’re on the list');
+    toast(t(d.id ? 'saved' : 'added'));
     refresh();
   } catch (err) {
     console.error(err);
-    showErr('Couldn’t save. Check your connection and try again.');
+    showErr(t('saveErr'));
   } finally {
     saving = false;
     $('fSave').disabled = false;
-    $('fSave').textContent = 'Save';
+    $('fSave').textContent = t('save');
   }
 }
 
@@ -674,17 +850,17 @@ async function onRemove() {
   if (!draft || !draft.id || saving) return;
   const d = draft;
   const p = state.people.find((x) => x.id === d.id);
-  if (!window.confirm('Remove ' + (p ? p.name : 'this entry') + ' from the list?')) return;
+  if (!window.confirm(t('confirmRemove', p ? p.name : t('thisEntry')))) return;
   saving = true;
   try {
     await store.removePerson(d.id);
     if (d.qrUrl) store.deleteQr(d.qrUrl).catch(console.error);
     closeSheet($('formSheet'));
-    toast('Removed');
+    toast(t('removed'));
     refresh();
   } catch (err) {
     console.error(err);
-    showErr('Couldn’t remove. Check your connection and try again.');
+    showErr(t('removeErr'));
   } finally {
     saving = false;
   }
@@ -808,7 +984,7 @@ function bindEvents() {
   });
   $('allBtn').addEventListener('click', () => {
     setMarked(toBoxIds.filter((id) => !state.boxed.has(id)), true);
-    toast('All marked as boxed');
+    toast(t('allToast'));
   });
   $('qrMark').addEventListener('click', (e) => {
     const b = e.target.closest('[data-action="mark"]');
@@ -843,26 +1019,51 @@ function bindEvents() {
   });
   $('form').addEventListener('submit', onSave);
   $('fRemove').addEventListener('click', onRemove);
+  document.querySelectorAll('.lang-btn').forEach((b) => {
+    b.addEventListener('click', () => setLang(b.dataset.lang));
+  });
 
   setInterval(() => tick(false), 20000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(true); });
 }
 
-function init() {
+let bannerKey = null;     // 'offline' | 'demo' | null
+
+// Rewrites every visible text in the current language.
+function applyLang() {
+  document.documentElement.lang = lang;
+  document.querySelector('meta[name="description"]').content = t('htmlDesc');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+  document.querySelectorAll('.lang-btn').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.lang === lang)); });
+  $('banner').hidden = !bannerKey;
+  if (bannerKey) $('banner').innerHTML = t(bannerKey);
   buildSchedGrid();
-  bindEvents();
   render();
+}
+
+function setLang(next) {
+  if (next === lang || !STRINGS[next]) return;
+  lang = next;
+  try { localStorage.setItem(LANG_KEY, lang); } catch (e) { /* storage blocked: applies to this visit only */ }
+  applyLang();
+}
+
+function init() {
+  bindEvents();
+  applyLang();
 
   const configured = SUPABASE_URL && SUPABASE_ANON_KEY;
   if (configured && !window.supabase) {
-    $('banner').textContent = 'Couldn’t reach the server. Check your connection and reload.';
-    $('banner').hidden = false;
+    bannerKey = 'offline';
+    applyLang();
     return;
   }
   store = configured ? supabaseStore() : demoStore();
   if (!store.live) {
-    $('banner').innerHTML = '<strong>Demo mode.</strong> Changes are saved only in this browser. Add the Supabase URL and key in <code>app.js</code> to share the list.';
-    $('banner').hidden = false;
+    bannerKey = 'demo';
+    applyLang();
   }
 
   refresh();
