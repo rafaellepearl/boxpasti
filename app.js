@@ -750,13 +750,11 @@ function render() {
 
 /* -------------------------------------------------------- Kitchen mode --- */
 
-// Every QR for this meal on one screen, at the biggest size that still fits.
+// Every QR for this meal, one big QR per row; scroll for the next.
 // URL: …/#cucina, so the kitchen can keep it as a bookmark.
 const KM_HASH = '#cucina';
-const KM_GAP = 8;          // px between tiles, as in .km-grid
-const KM_LABEL = 18;       // px a tile adds below its QR: name, padding, borders
-const KM_MIN = 110;        // px: below this a QR gets hard to scan, so scroll instead
-const KM_MAX = 420;        // px: no point in bigger on a tablet
+const KM_LABEL = 26;       // px a tile is taller than wide: name, gap, padding, borders
+const KM_MAX = 560;        // px: no point in bigger on a tablet
 
 let lastKmHtml = null;
 let kmPushed = false;      // we added the #cucina history entry, so Back can undo it
@@ -790,24 +788,14 @@ function renderKitchen() {
   fitKitchen(ids.length);
 }
 
-// Picks the column count that gives the biggest QR with every tile on screen.
+// Sizes each tile as wide as the screen allows, but never taller than the space
+// between the header and the button, so a whole QR and its name are always visible at once.
 function fitKitchen(n) {
   const g = $('kmGrid');
   if (!n || g.hidden) return;
   const w = g.clientWidth - 24;      // .km-grid side padding
   const h = g.clientHeight - 20;     // .km-grid top and bottom padding
-  let best = { cols: 1, cell: 0 };
-  for (let cols = 1; cols <= n; cols++) {
-    const rows = Math.ceil(n / cols);
-    const cell = Math.min((w - (cols - 1) * KM_GAP) / cols, (h - (rows - 1) * KM_GAP) / rows - KM_LABEL);
-    if (cell > best.cell) best = { cols: cols, cell: cell };
-  }
-  if (best.cell < KM_MIN) {
-    const cols = Math.max(1, Math.floor((w + KM_GAP) / (KM_MIN + KM_GAP)));
-    best = { cols: cols, cell: (w - (cols - 1) * KM_GAP) / cols };
-  }
-  g.style.setProperty('--cols', best.cols);
-  g.style.setProperty('--cell', Math.floor(Math.min(best.cell, KM_MAX)) + 'px');
+  g.style.setProperty('--cell', Math.floor(Math.min(w, h - KM_LABEL, KM_MAX)) + 'px');
 }
 
 // Keeps the phone from locking while the kitchen is scanning.

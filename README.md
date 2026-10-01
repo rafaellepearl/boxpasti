@@ -46,7 +46,7 @@ Button names are shown in Italian, with the English version in brackets.
   Done cards turn green, show a "Pronto" stamp and move to the bottom. The bar at the top counts how many are done.
 - If someone adds themselves after that, their card appears at the top without the green, so it's easy to spot.
   Tap **✓ Pronto** on a card to undo it.
-- **Modalità cucina** (Kitchen mode) shows every QR for the meal on one screen, as large as fits, with a big **Segna tutti pronti** button.
+- **Modalità cucina** (Kitchen mode) shows every QR for the meal, one big QR per row (scroll for the next), with a big **Segna tutti pronti** button.
   Tap a tile to mark just that one. The screen stays on while it's open. Save the `#cucina` link on the kitchen phone to open it directly.
 
 **Rules**

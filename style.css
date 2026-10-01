@@ -156,23 +156,25 @@ button:focus-visible, input:focus-visible, .search:focus-within, .upload:focus-w
 .km-progress .meter { flex-grow: 1; }
 .km-grid {
   flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
-  display: grid; gap: 8px; padding: 10px 12px; justify-content: center; align-content: start;
-  grid-template-columns: repeat(var(--cols, 2), var(--cell, 150px));
+  display: grid; gap: 12px; padding: 10px 12px; justify-content: center; align-content: start;
+  grid-template-columns: var(--cell, 300px);
+  scroll-snap-type: y proximity; scroll-padding-top: 10px;
 }
 .km-tile {
-  border: 1px solid var(--line); background: var(--white); padding: 6px 6px 4px; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid var(--line); background: var(--white); padding: 8px 8px 6px; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  scroll-snap-align: start;
   transition: background-color 180ms ease-out, border-color 180ms ease-out;
 }
 .km-qr { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; }
 .km-qr img { width: 100%; height: 100%; object-fit: contain; display: block; transition: opacity 180ms ease-out; }
 .km-name {
-  max-width: 100%; height: 16px; font-size: 12px; font-weight: 700; line-height: 16px;
+  max-width: 100%; height: 22px; font-size: 17px; font-weight: 700; line-height: 22px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .km-tile.is-done { background: var(--done-bg); border-color: var(--done); box-shadow: inset 0 0 0 1px var(--done); }
 .km-tile.is-done img, .km-tile.is-done .no-qr { opacity: 0.18; }
-.km-tile .stamp { font-size: 11px; padding: 4px 8px; }
+.km-tile .stamp { font-size: 18px; padding: 8px 16px; border-width: 3px; }
 .km-foot { padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 2px solid var(--ink); }
 .km-all { width: 100%; height: 56px; justify-content: center; font-size: 17px; }
 @media (prefers-reduced-motion: reduce) { .km-tile, .km-qr img { transition: none; } }
