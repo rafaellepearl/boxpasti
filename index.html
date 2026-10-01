@@ -68,6 +68,10 @@
         </div>
         <button id="allBtn" class="btn-all"></button>
       </div>
+      <button id="kmOpen" class="btn-km" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+        <span data-i18n="kmOpen">Modalità cucina: tutti i QR in una pagina</span>
+      </button>
       <p class="hint" data-i18n="hintBox">Cucina: scansiona ogni QR e prepara il box. Tocca un QR per ingrandirlo.</p>
       <div id="boxGrid" class="grid"></div>
       <div id="boxEmpty" class="empty">Caricamento…</div>
@@ -87,6 +91,28 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
       <span data-i18n="addQr">Aggiungi il tuo QR</span>
     </button>
+  </div>
+</div>
+
+<!-- Kitchen mode: every QR for this meal on one screen -->
+<div id="kitchen" class="km" role="dialog" aria-modal="true" aria-labelledby="kmTitle" hidden>
+  <header class="km-head">
+    <div class="km-heading">
+      <div class="eyebrow"><span data-i18n="kmEyebrow">Cucina</span> · <span id="kmDate"></span></div>
+      <h2 id="kmTitle" class="km-title"></h2>
+    </div>
+    <button id="kmClose" class="icon-close" aria-label="Esci dalla modalità cucina" data-i18n-aria="kmClose">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+  </header>
+  <div class="km-progress">
+    <div id="kmCount" class="kitchen-count"></div>
+    <div class="meter" aria-hidden="true"><span id="kmFill"></span></div>
+  </div>
+  <div id="kmGrid" class="km-grid"></div>
+  <div id="kmEmpty" class="empty" hidden></div>
+  <div class="km-foot">
+    <button id="kmAll" class="btn-all km-all"></button>
   </div>
 </div>
 

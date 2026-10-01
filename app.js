@@ -56,6 +56,10 @@ const STRINGS = {
     foot: 'Si azzera dopo pranzo (15:00) e cena (21:30).',
     addQr: 'Aggiungi il tuo QR',
     close: 'Chiudi',
+    kmOpen: 'Modalità cucina: tutti i QR in una pagina',
+    kmEyebrow: 'Cucina',
+    kmClose: 'Esci dalla modalità cucina',
+    kmEmpty: 'Nessun box da fare per questo pasto.',
     doneOf: (done, total) => done + ' di ' + total + ' pronti',
     markAll: 'Segna tutti pronti',
     allDone: 'Tutti pronti',
@@ -143,6 +147,10 @@ const STRINGS = {
     foot: 'Resets after lunch (15:00) and dinner (21:30).',
     addQr: 'Add your QR',
     close: 'Close',
+    kmOpen: 'Kitchen mode: every QR on one page',
+    kmEyebrow: 'Kitchen',
+    kmClose: 'Exit kitchen mode',
+    kmEmpty: 'No boxes to do for this meal.',
     doneOf: (done, total) => done + ' of ' + total + ' boxed',
     markAll: 'Mark all boxed',
     allDone: 'All boxed',
@@ -520,15 +528,21 @@ const state = {
 let store = null;
 let loadSeq = 0;
 let refreshTimer = null;
+let pendingWrites = 0;      // quick changes shown on screen but still being saved
+let writeGen = 0;           // goes up with every save, so a refresh can tell it overlapped one
+let writeQueue = Promise.resolve();
 let toBoxIds = [];        // everyone on To box for this meal, ignoring the search
 let qrPersonId = null;    // whose QR is enlarged
 
 async function refresh() {
   const seq = ++loadSeq;
+  const gen = writeGen;
   const key = state.svc.key;
   try {
     const [people, ovs, boxed] = await Promise.all([store.loadPeople(), store.loadOverrides(key), store.loadBoxed(key)]);
     if (seq !== loadSeq) return;
+    // A save overlapped this load, so it may be older than the screen. Load again once saves settle.
+    if (pendingWrites || gen !== writeGen) { refreshSoon(); return; }
     state.people = people.map((p) => ({
       id: p.id, name: p.name, qrUrl: p.qr_url, recurring: !!p.recurring, sched: normSched(p.schedule)
     }));
@@ -546,6 +560,18 @@ async function refresh() {
 function refreshSoon() {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(refresh, 250);
+}
+
+// Runs saves one at a time, in tap order, so a quick mark-then-undo ends the way it looks.
+function queueSave(fn) {
+  pendingWrites++;
+  writeGen++;
+  const run = writeQueue.then(fn);
+  writeQueue = run.catch(() => {});
+  return run.finally(() => {
+    pendingWrites--;
+    if (!pendingWrites) refreshSoon();
+  });
 }
 
 // Moves to the next service when the clock passes 15:00 / 21:30.
@@ -572,10 +598,13 @@ async function setBoxed(p, want) {
   else state.overrides[p.id] = want ? 'box' : 'unbox';
   render();
   toast(t(want ? 'movedIn' : 'movedOut', p.name));
+  const st = state.overrides[p.id];
   try {
-    if (want === natural) await store.clearOverride(key, p.id);
-    else await store.setOverride(key, p.id, state.overrides[p.id]);
-    if (wasMarked) await store.unmarkBoxed(key, [p.id]);
+    await queueSave(async () => {
+      if (want === natural) await store.clearOverride(key, p.id);
+      else await store.setOverride(key, p.id, st);
+      if (wasMarked) await store.unmarkBoxed(key, [p.id]);
+    });
   } catch (e) {
     console.error(e);
     if (prev) state.overrides[p.id] = prev; else delete state.overrides[p.id];
@@ -592,8 +621,7 @@ async function setMarked(ids, on) {
   ids.forEach((id) => { if (on) state.boxed.add(id); else state.boxed.delete(id); });
   render();
   try {
-    if (on) await store.markBoxed(key, ids);
-    else await store.unmarkBoxed(key, ids);
+    await queueSave(() => (on ? store.markBoxed(key, ids) : store.unmarkBoxed(key, ids)));
   } catch (e) {
     console.error(e);
     if (key === state.svc.key) {
@@ -706,6 +734,107 @@ function render() {
     const p = state.people.find((x) => x.id === qrPersonId);
     $('qrMark').innerHTML = p && toBoxIds.includes(p.id) ? markBtnHtml(p, state.boxed.has(p.id)) : '';
   }
+
+  $('kmOpen').hidden = !toBoxIds.length;
+  if (!$('kitchen').hidden) renderKitchen();
+}
+
+/* -------------------------------------------------------- Kitchen mode --- */
+
+// Every QR for this meal on one screen, at the biggest size that still fits.
+// URL: …/#cucina, so the kitchen can keep it as a bookmark.
+const KM_HASH = '#cucina';
+const KM_GAP = 8;          // px between tiles, as in .km-grid
+const KM_LABEL = 18;       // px a tile adds below its QR: name, padding, borders
+const KM_MIN = 110;        // px: below this a QR gets hard to scan, so scroll instead
+const KM_MAX = 420;        // px: no point in bigger on a tablet
+
+let lastKmHtml = null;
+let kmPushed = false;      // we added the #cucina history entry, so Back can undo it
+let wakeLock = null;
+
+function kmTileHtml(p) {
+  const done = state.boxed.has(p.id);
+  const stamp = done ? `<span class="stamp" aria-hidden="true">${DONE_ICON}${esc(t('marked'))}</span>` : '';
+  const qr = p.qrUrl ? `<img src="${esc(p.qrUrl)}" alt="">` : `<span class="no-qr">${esc(t('noQrYet'))}</span>`;
+  return `<button class="km-tile${done ? ' is-done' : ''}" data-id="${esc(p.id)}" aria-pressed="${done}" aria-label="${esc(t(done ? 'markedAria' : 'markAria', p.name))}"><span class="km-qr">${qr}${stamp}</span><span class="km-name">${esc(p.name)}</span></button>`;
+}
+
+function renderKitchen() {
+  // Still to box first, like the list.
+  const ids = toBoxIds.slice().sort((a, b) => state.boxed.has(a) - state.boxed.has(b));
+  const done = ids.filter((id) => state.boxed.has(id)).length;
+  const allDone = done === ids.length;
+  $('kmDate').textContent = $('dateLabel').textContent;
+  $('kmTitle').textContent = $('mealTitle').textContent;
+  $('kmCount').textContent = t('doneOf', done, ids.length);
+  $('kmFill').style.width = (ids.length ? 100 * done / ids.length : 0) + '%';
+  $('kmAll').hidden = !ids.length;
+  $('kmAll').disabled = allDone;
+  $('kmAll').innerHTML = DONE_ICON + esc(t(allDone ? 'allDone' : 'markAll'));
+
+  const html = ids.map((id) => kmTileHtml(state.people.find((p) => p.id === id))).join('');
+  if (html !== lastKmHtml) { $('kmGrid').innerHTML = html; lastKmHtml = html; }
+  $('kmGrid').hidden = !ids.length;
+  $('kmEmpty').hidden = ids.length > 0;
+  $('kmEmpty').textContent = state.loaded ? t('kmEmpty') : t('loading');
+  fitKitchen(ids.length);
+}
+
+// Picks the column count that gives the biggest QR with every tile on screen.
+function fitKitchen(n) {
+  const g = $('kmGrid');
+  if (!n || g.hidden) return;
+  const w = g.clientWidth - 24;      // .km-grid side padding
+  const h = g.clientHeight - 20;     // .km-grid top and bottom padding
+  let best = { cols: 1, cell: 0 };
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const cell = Math.min((w - (cols - 1) * KM_GAP) / cols, (h - (rows - 1) * KM_GAP) / rows - KM_LABEL);
+    if (cell > best.cell) best = { cols: cols, cell: cell };
+  }
+  if (best.cell < KM_MIN) {
+    const cols = Math.max(1, Math.floor((w + KM_GAP) / (KM_MIN + KM_GAP)));
+    best = { cols: cols, cell: (w - (cols - 1) * KM_GAP) / cols };
+  }
+  g.style.setProperty('--cols', best.cols);
+  g.style.setProperty('--cell', Math.floor(Math.min(best.cell, KM_MAX)) + 'px');
+}
+
+// Keeps the phone from locking while the kitchen is scanning.
+async function keepAwake(on) {
+  try {
+    if (on && !wakeLock && 'wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+    }
+  } catch (e) { /* unsupported or refused: the phone keeps its own screen timeout */ }
+}
+
+// Opens or closes kitchen mode to match the address (#cucina), so Back works too.
+function syncKitchen() {
+  const want = location.hash === KM_HASH;
+  const el = $('kitchen');
+  if (want === !el.hidden) return;
+  el.hidden = !want;
+  document.body.classList.toggle('locked', want);
+  keepAwake(want);
+  if (want) {
+    lastKmHtml = null;
+    render();
+    $('kmClose').focus();
+  } else {
+    kmPushed = false;
+    if (!$('kmOpen').hidden) $('kmOpen').focus();
+  }
+}
+
+function closeKitchen() {
+  if (kmPushed) { history.back(); return; }
+  history.replaceState(null, '', location.pathname + location.search);
+  syncKitchen();
 }
 
 let toastTimer = null;
@@ -1023,6 +1152,18 @@ function bindEvents() {
     setMarked(toBoxIds.filter((id) => !state.boxed.has(id)), true);
     toast(t('allToast'));
   });
+  $('kmOpen').addEventListener('click', () => { kmPushed = true; location.hash = KM_HASH; });
+  $('kmClose').addEventListener('click', closeKitchen);
+  $('kmAll').addEventListener('click', () => {
+    setMarked(toBoxIds.filter((id) => !state.boxed.has(id)), true);
+    toast(t('allToast'));
+  });
+  $('kmGrid').addEventListener('click', (e) => {
+    const b = e.target.closest('.km-tile');
+    if (b) setMarked([b.dataset.id], !state.boxed.has(b.dataset.id));
+  });
+  window.addEventListener('hashchange', syncKitchen);
+  window.addEventListener('resize', () => { if (!$('kitchen').hidden) fitKitchen(toBoxIds.length); });
   $('qrMark').addEventListener('click', (e) => {
     const b = e.target.closest('[data-action="mark"]');
     if (b) setMarked([b.dataset.id], !state.boxed.has(b.dataset.id));
@@ -1038,6 +1179,7 @@ function bindEvents() {
     if (e.key !== 'Escape') return;
     closeSheet($('qrSheet'));
     closeSheet($('formSheet'));
+    if (!$('kitchen').hidden) closeKitchen();
   });
 
   $('fName').addEventListener('input', () => showErr(''));
@@ -1061,7 +1203,11 @@ function bindEvents() {
   });
 
   setInterval(() => tick(false), 20000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(true); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    tick(true);
+    if (!$('kitchen').hidden) keepAwake(true);   // the browser drops the wake lock when the page is hidden
+  });
 }
 
 let bannerKey = null;     // 'offline' | 'demo' | null
@@ -1090,6 +1236,7 @@ function setLang(next) {
 function init() {
   bindEvents();
   applyLang();
+  syncKitchen();
 
   const configured = SUPABASE_URL && SUPABASE_ANON_KEY;
   if (configured && !window.supabase) {
