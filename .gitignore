@@ -1,0 +1,10 @@
+# Contains everyone's meal QR codes: keep it out of the public repo.
+*.pdf
+
+# Real names and schedules of the group.
+supabase/seed.local.sql
+Main.dc.html
+
+# Local tooling.
+.claude/
+.mcp.json
