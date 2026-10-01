@@ -1,0 +1,29 @@
+# Supabase pauses free projects after about a week with no traffic (holidays, exam weeks).
+# This reads one row twice a week so that never happens. It stores nothing.
+# If the project is already paused, the run fails and GitHub emails you: restore it in the dashboard.
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: '17 6 * * 1,4'   # Mondays and Thursdays, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read one row
+        run: |
+          # The URL and the publishable key are already public in app.js.
+          url=$(grep -oP "SUPABASE_URL = '\K[^']+" app.js)
+          key=$(grep -oP "SUPABASE_ANON_KEY = '\K[^']+" app.js)
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+            "$url/rest/v1/people?select=id&limit=1" -H "apikey: $key")
+          echo "Supabase answered $code"
+          test "$code" = 200

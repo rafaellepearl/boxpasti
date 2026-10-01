@@ -8,12 +8,16 @@
 const SUPABASE_URL = 'https://fmzimevpuzaodixruvzb.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_bFo-V9pQnzcbhSKbSwwG2Q_zfO37rhH';
 
+// The deploy (.github/workflows/deploy.yml) stamps this and index.html with the same build id.
+const BUILD = '__VERSION__';
+
 const TZ = 'Europe/Rome';
 const LUNCH_ENDS = 15 * 60;            // minutes after midnight, Rome time
 const DINNER_ENDS = 21 * 60 + 30;
 const KEEP_OVERRIDES_DAYS = 7;
 const QR_BUCKET = 'qr';
 const JSQR_SRC = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+const JSQR_SRI = 'sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx';
 
 // Upload checks. A phone screenshot is usually 0.5–5 MB and about 1000–3000 px tall.
 const QR_MAX_FILE_MB = 10;
@@ -53,7 +57,7 @@ const STRINGS = {
     tabNot: 'Senza box',
     hintBox: 'Cucina: scansiona ogni QR e prepara il box. Tocca un QR per ingrandirlo.',
     hintNot: 'Ritiri tu il pasto. Non ce la fai? Tocca Fammi il box.',
-    foot: 'Si azzera dopo pranzo (15:00) e cena (21:30).',
+    foot: (lunch, dinner) => 'Si azzera dopo pranzo (' + lunch + ') e cena (' + dinner + ').',
     addQr: 'Aggiungi il tuo QR',
     close: 'Chiudi',
     kmOpen: 'Modalità cucina: tutti i QR in una pagina',
@@ -144,7 +148,7 @@ const STRINGS = {
     tabNot: 'Not boxed',
     hintBox: 'Kitchen: scan each QR and box the meal. Tap a QR to enlarge it.',
     hintNot: 'Picking up yourself. Can’t make it? Tap Box me.',
-    foot: 'Resets after lunch (15:00) and dinner (21:30).',
+    foot: (lunch, dinner) => 'Resets after lunch (' + lunch + ') and dinner (' + dinner + ').',
     addQr: 'Add your QR',
     close: 'Close',
     kmOpen: 'Kitchen mode: every QR on one page',
@@ -283,6 +287,11 @@ function romeParts() {
   return { y: +p.year, mo: +p.month, d: +p.day, h: (+p.hour) % 24, mi: +p.minute };
 }
 
+// 900 → '15:00'
+function hhmm(minutes) {
+  return String(Math.floor(minutes / 60)).padStart(2, '0') + ':' + String(minutes % 60).padStart(2, '0');
+}
+
 // Dates below are UTC-midnight values standing in for Rome calendar days.
 function ymd(date) {
   return date.toISOString().slice(0, 10);
@@ -304,7 +313,7 @@ function currentService() {
     date: date,
     day: DAYS[date.getUTCDay() - 1],
     meal: meal,
-    reset: meal === 'L' ? '15:00' : '21:30'
+    reset: hhmm(meal === 'L' ? LUNCH_ENDS : DINNER_ENDS)
   };
 }
 
@@ -1023,6 +1032,8 @@ function loadJsQR() {
     jsQRPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = JSQR_SRC;
+      s.integrity = JSQR_SRI;
+      s.crossOrigin = 'anonymous';
       s.onload = () => (window.jsQR ? resolve(window.jsQR) : reject(new Error('jsQR missing')));
       s.onerror = () => { jsQRPromise = null; reject(new Error('jsQR failed to load')); };
       document.head.appendChild(s);
@@ -1217,6 +1228,7 @@ function applyLang() {
   document.documentElement.lang = lang;
   document.querySelector('meta[name="description"]').content = t('htmlDesc');
   document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  $('foot').textContent = t('foot', hhmm(LUNCH_ENDS), hhmm(DINNER_ENDS));
   document.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   document.querySelectorAll('.lang-btn').forEach((b) => { b.setAttribute('aria-pressed', String(b.dataset.lang === lang)); });
@@ -1233,7 +1245,23 @@ function setLang(next) {
   applyLang();
 }
 
+// Right after a deploy, a phone can pair a cached page with the newer script (or the reverse),
+// and the script then misses parts of the page it needs. Both carry the same build id,
+// so on a mismatch reload once to get a matching pair.
+function staleBuild() {
+  const page = document.documentElement.dataset.build;
+  if (!page || page === BUILD) return false;
+  const key = 'boxpasti-reloaded-' + BUILD;
+  try {
+    if (sessionStorage.getItem(key)) return false;    // already tried: carry on rather than loop
+    sessionStorage.setItem(key, '1');
+  } catch (e) { return false; }
+  location.reload();
+  return true;
+}
+
 function init() {
+  if (staleBuild()) return;
   bindEvents();
   applyLang();
   syncKitchen();
