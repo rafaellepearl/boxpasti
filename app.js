@@ -15,6 +15,14 @@ const KEEP_OVERRIDES_DAYS = 7;
 const QR_BUCKET = 'qr';
 const JSQR_SRC = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
 
+// Upload checks. A phone screenshot is usually 0.5–5 MB and about 1000–3000 px tall.
+const QR_MAX_FILE_MB = 10;
+const QR_MAX_SIDE = 6000;      // px, longest side of the picture
+const QR_MIN_SIDE = 150;       // px, shortest side of the picture
+const QR_MIN_CODE = 120;       // px, width of the QR itself, so each square is big enough to scan
+// The meal app's QR codes carry an ID like 1b4e28ba-2fa1-11d2-883f-0016d3cca427.
+const MEAL_QR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const MEALS = ['L', 'D'];
 const LANG_KEY = 'boxpasti-lang';
@@ -85,11 +93,17 @@ const STRINGS = {
     yourQrAlt: 'Il QR che hai caricato',
     upload: 'Carica QR',
     replace: 'Sostituisci QR',
-    qrHelp: 'Uno screenshot del QR dall’app dei pasti.',
+    qrHelp: 'Uno screenshot dell’app dei pasti con il tuo QR, anche a schermo intero (max 10 MB).',
     reading: 'Lettura dell’immagine…',
-    found: 'QR trovato e ritagliato.',
-    notFound: 'Non trovo un QR nell’immagine. Se puoi, ritaglia lo screenshot sul solo codice.',
+    found: 'QR trovato, controllato e ritagliato.',
     badImage: 'Impossibile leggere l’immagine. Prova con uno screenshot PNG o JPG.',
+    notImage: 'Questo file non è un’immagine. Carica uno screenshot PNG o JPG.',
+    tooBig: 'Immagine troppo grande: massimo 10 MB e 6000 px per lato.',
+    tooSmall: 'Immagine troppo piccola: serve almeno 150 × 150 px. Usa lo screenshot originale, non una miniatura.',
+    noQr: 'Non trovo nessun QR in questa immagine. Carica uno screenshot con il QR dell’app dei pasti ben visibile.',
+    notMealQr: 'Questo QR non è quello dell’app dei pasti. Controlla di aver caricato il QR giusto.',
+    qrTooSmall: 'Il QR è troppo piccolo per essere letto bene. Ingrandiscilo prima di fare lo screenshot.',
+    checkFailed: 'Impossibile controllare l’immagine. Controlla la connessione e riprova.',
     weekly: 'Box ogni settimana',
     weeklyHelp: 'Scegli i pasti che salti sempre. Puoi disattivarlo quando vuoi.',
     save: 'Salva',
@@ -166,11 +180,17 @@ const STRINGS = {
     yourQrAlt: 'Your uploaded QR',
     upload: 'Upload QR',
     replace: 'Replace QR',
-    qrHelp: 'A screenshot of the QR from the meal app.',
+    qrHelp: 'A screenshot of the meal app showing your QR. A full-screen one is fine (max 10 MB).',
     reading: 'Reading the image…',
-    found: 'Found your QR and cropped it.',
-    notFound: 'Couldn’t spot a QR in that image. Crop the screenshot to just the code if you can.',
+    found: 'Found your QR, checked it and cropped it.',
     badImage: 'That image couldn’t be read. Try a PNG or JPG screenshot.',
+    notImage: 'That file isn’t an image. Upload a PNG or JPG screenshot.',
+    tooBig: 'That image is too big: 10 MB and 6000 px per side at most.',
+    tooSmall: 'That image is too small: it needs to be at least 150 × 150 px. Use the original screenshot, not a thumbnail.',
+    noQr: 'There’s no QR in this image. Upload a screenshot where the meal app’s QR is clearly visible.',
+    notMealQr: 'This isn’t a meal-app QR. Check you uploaded the right one.',
+    qrTooSmall: 'The QR is too small to scan reliably. Zoom in on it before taking the screenshot.',
+    checkFailed: 'Couldn’t check the image. Check your connection and try again.',
     weekly: 'Box me every week',
     weeklyHelp: 'Pick the meals you always miss. Turn off any time.',
     save: 'Save',
@@ -797,19 +817,18 @@ async function onFile(e) {
   upload.classList.add('is-busy');
   setNote(t('reading'), false);
   try {
-    const out = await prepareQr(file);
+    const blob = await prepareQr(file);
     if (draft !== forDraft) return;
     if (draft.preview) URL.revokeObjectURL(draft.preview);
-    draft.blob = out.blob;
-    draft.preview = URL.createObjectURL(out.blob);
+    draft.blob = blob;
+    draft.preview = URL.createObjectURL(blob);
     showErr('');
-    if (out.found) setNote(t('found'), false);
-    else setNote(t('notFound'), true);
+    setNote(t('found'), false);
     updateForm();
   } catch (err) {
-    console.error(err);
-    setNote(t('qrHelp'), false);
-    showErr(t('badImage'));
+    // Refused: the picture is dropped and any QR already in the form stays as it was.
+    if (!err.code) console.error(err);
+    if (draft === forDraft) setNote(t(err.code || 'badImage'), true);
   } finally {
     upload.classList.remove('is-busy');
   }
@@ -900,14 +919,18 @@ function canvasOf(w, h) {
   return c;
 }
 
-// Finds the QR in a screenshot and returns a square crop around it (with a quiet zone).
-async function findQrBox(img) {
-  let jsQR;
-  try { jsQR = await loadJsQR(); } catch (e) { return null; }
+function qrError(code) {
+  const e = new Error(code);
+  e.code = code;            // a STRINGS key, shown to the person as is
+  return e;
+}
+
+// Finds the QR in a screenshot: its content, its size in pixels, and a square crop around it (with a quiet zone).
+function findQr(img, jsQR) {
   const w0 = img.naturalWidth;
   const h0 = img.naturalHeight;
   const first = Math.min(1, 1200 / Math.max(w0, h0));
-  const scales = first < 1 && w0 * h0 <= 6e6 ? [first, 1] : [first];
+  const scales = first < 1 && w0 * h0 <= 12e6 ? [first, 1] : [first];
   for (const s of scales) {
     const w = Math.round(w0 * s);
     const h = Math.round(h0 * s);
@@ -930,6 +953,8 @@ async function findQrBox(img) {
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
     return {
+      data: code.data,
+      size: size,
       x: Math.max(0, Math.min(w0 - side, cx - side / 2)),
       y: Math.max(0, Math.min(h0 - side, cy - side / 2)),
       side: side
@@ -938,26 +963,38 @@ async function findQrBox(img) {
   return null;
 }
 
-// Crops to the QR when it can find one, downscales, and re-encodes as PNG.
+// Checks the upload and returns a 400px PNG crop of its QR.
+// Throws qrError(code) when the picture is refused, so nothing gets saved.
 async function prepareQr(file) {
+  if (file.type && !file.type.startsWith('image/')) throw qrError('notImage');
+  if (file.size > QR_MAX_FILE_MB * 1024 * 1024) throw qrError('tooBig');
+  let jsQR;
+  try { jsQR = await loadJsQR(); } catch (e) { throw qrError('checkFailed'); }
   const { img, url } = await loadImage(file);
   try {
-    const box = await findQrBox(img);
-    let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight, max = 800;
-    if (box) { sx = box.x; sy = box.y; sw = box.side; sh = box.side; max = 400; }
-    const scale = Math.min(1, max / Math.max(sw, sh));
-    const w = Math.max(1, Math.round(sw * scale));
-    const h = Math.max(1, Math.round(sh * scale));
-    const c = canvasOf(w, h);
-    const ctx = c.getContext('2d');
+    const w0 = img.naturalWidth;
+    const h0 = img.naturalHeight;
+    if (Math.max(w0, h0) > QR_MAX_SIDE) throw qrError('tooBig');
+    if (Math.min(w0, h0) < QR_MIN_SIDE) throw qrError('tooSmall');
+    const qr = findQr(img, jsQR);
+    if (!qr) throw qrError('noQr');
+    if (!MEAL_QR.test(qr.data)) throw qrError('notMealQr');
+    if (qr.size < QR_MIN_CODE) throw qrError('qrTooSmall');
+
+    const scale = Math.min(1, 400 / qr.side);
+    const w = Math.max(1, Math.round(qr.side * scale));
+    const c = canvasOf(w, w);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(0, 0, w, w);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-    const blob = await new Promise((resolve, reject) => {
-      c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), 'image/png');
+    ctx.drawImage(img, qr.x, qr.y, qr.side, qr.side, 0, 0, w, w);
+    // What we save has to scan to the very same code.
+    const again = jsQR(ctx.getImageData(0, 0, w, w).data, w, w);
+    if (!again || again.data !== qr.data) throw qrError('badImage');
+    return await new Promise((resolve, reject) => {
+      c.toBlob((b) => (b ? resolve(b) : reject(qrError('badImage'))), 'image/png');
     });
-    return { blob: blob, found: !!box };
   } finally {
     URL.revokeObjectURL(url);
   }

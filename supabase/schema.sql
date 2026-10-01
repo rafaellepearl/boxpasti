@@ -84,11 +84,14 @@ begin
 exception when duplicate_object then null;
 end $$;
 
--- Storage: public bucket for QR images (PNG, max 2 MB) ----------------------
+-- Storage: public bucket for QR images ----------------------------------------
+-- The page saves a checked 400px PNG crop (about 10–30 KB), so 512 KB is plenty
+-- and stops anyone from filling the bucket with big files through the API.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('qr', 'qr', true, 2097152, array['image/png'])
-on conflict (id) do nothing;
+values ('qr', 'qr', true, 524288, array['image/png'])
+on conflict (id) do update set file_size_limit = excluded.file_size_limit,
+                               allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "anon select qr" on storage.objects;
 drop policy if exists "anon insert qr" on storage.objects;
